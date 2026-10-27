@@ -6,7 +6,7 @@
   'use strict';
 
   const QC = (root.QC = root.QC || {});
-  const { DEFAULT_SETTINGS, LIMITS, SETTINGS_VERSION } =
+  const { DEFAULT_SETTINGS, LIMITS, SETTINGS_VERSION, ANNOUNCE_LANGUAGES } =
     typeof module !== 'undefined' && module.exports ? require('./defaults.js') : QC.defaults;
 
   const FIRST_SURAH = 1;
@@ -37,7 +37,7 @@
     const src = input && typeof input === 'object' ? input : {};
     const value = { ...DEFAULT_SETTINGS };
 
-    for (const key of ['autoPlayEnabled', 'preservePlaybackSpeed', 'showPageNotifications']) {
+    for (const key of ['autoPlayEnabled', 'preservePlaybackSpeed', 'showPageNotifications', 'announceNextSurah']) {
       if (key in src) {
         if (typeof src[key] === 'boolean') value[key] = src[key];
         else errors[key] = 'Must be on or off.';
@@ -52,6 +52,11 @@
         if (isValidSurahNumber(n)) value.endSurah = n;
         else errors.endSurah = `Choose a surah from ${FIRST_SURAH} to ${LAST_SURAH}, or none.`;
       }
+    }
+
+    if ('announceLanguage' in src) {
+      if (ANNOUNCE_LANGUAGES.includes(src.announceLanguage)) value.announceLanguage = src.announceLanguage;
+      else errors.announceLanguage = 'Choose English or Arabic.';
     }
 
     for (const key of ['retryCount', 'retryDelaySeconds']) {

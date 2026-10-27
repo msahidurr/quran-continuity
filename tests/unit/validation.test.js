@@ -73,3 +73,49 @@ test('evaluateCompletion stops at the ending surah and beyond it', () => {
 test('evaluateCompletion stops after An-Nas', () => {
   assert.deepEqual(evaluateCompletion(114, { endSurah: null }), { action: 'stop', reason: 'end-of-quran' });
 });
+
+const { announcementFor } = require('../../src/shared/announcement.js');
+
+test('announcement text in English and Arabic', () => {
+  assert.deepEqual(announcementFor(2, 'en'), { text: 'Next surah: Al-Baqarah, number 2.', lang: 'en-US' });
+  assert.deepEqual(announcementFor(18, 'ar'), { text: 'السورة التالية: سورة الكهف', lang: 'ar' });
+  assert.equal(announcementFor(115, 'en'), null);
+});
+
+test('announcement settings are validated', () => {
+  assert.equal(validateSettings({ announceNextSurah: false, announceLanguage: 'ar' }).valid, true);
+  const { valid, errors } = validateSettings({ announceNextSurah: 'yes', announceLanguage: 'fr' });
+  assert.equal(valid, false);
+  assert.deepEqual(Object.keys(errors).sort(), ['announceLanguage', 'announceNextSurah']);
+  assert.equal(normalizeSettings({ announceLanguage: 'xx' }).announceLanguage, 'en');
+});
+
+const { chooseSpeech, voiceFor } = require('../../src/shared/announcement.js');
+const GOOGLE_VOICES = [
+  { voiceName: 'Google US English', lang: 'en-US', remote: true },
+  { voiceName: 'Google UK English Male', lang: 'en-GB', remote: true },
+  { voiceName: 'Google Deutsch', lang: 'de-DE', remote: true },
+];
+
+test('chooseSpeech uses an Arabic voice when one is installed', () => {
+  const voices = [...GOOGLE_VOICES, { voiceName: 'Microsoft Naayf', lang: 'ar-SA', remote: false }];
+  assert.deepEqual(chooseSpeech(voices, 2, 'ar'), { text: 'السورة التالية: سورة البقرة', lang: 'ar', voiceName: 'Microsoft Naayf', fallback: false });
+});
+
+test('chooseSpeech falls back to English when no Arabic voice exists', () => {
+  const s = chooseSpeech(GOOGLE_VOICES, 2, 'ar');
+  assert.equal(s.fallback, true);
+  assert.equal(s.text, 'Next surah: Al-Baqarah, number 2.');
+  assert.equal(s.voiceName, 'Google US English');
+});
+
+test('chooseSpeech without any voices lets Chrome use its default', () => {
+  assert.deepEqual(chooseSpeech([], 2, 'en'), { text: 'Next surah: Al-Baqarah, number 2.', lang: 'en-US', voiceName: null, fallback: false });
+});
+
+test('voiceFor prefers exact language, then local voices', () => {
+  assert.equal(voiceFor(GOOGLE_VOICES, 'en-US').voiceName, 'Google US English');
+  const voices = [{ voiceName: 'Online ar', lang: 'ar-EG', remote: true }, { voiceName: 'Local ar', lang: 'ar-SA', remote: false }];
+  assert.equal(voiceFor(voices, 'ar').voiceName, 'Local ar');
+  assert.equal(voiceFor(voices, 'fr'), null);
+});

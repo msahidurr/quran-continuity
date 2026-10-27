@@ -12,7 +12,7 @@ const { AudioDetector } = require('../../src/content/audio-detector.js');
 const { PlaybackController } = require('../../src/content/playback-controller.js');
 const { normalizeSettings } = require('../../src/shared/validation.js');
 
-const TIMING = { graceMs: 5, pageTimeoutMs: 60, playTimeoutMs: 60, pollMs: 2, secondMs: 1 };
+const TIMING = { graceMs: 5, pageTimeoutMs: 60, playTimeoutMs: 60, pollMs: 2, secondMs: 1, announceMaxMs: 40 };
 const audioUrl = (n) => `https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/${n}.mp3`;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -24,7 +24,7 @@ async function until(predicate, ms = 500) {
   }
 }
 
-function setup({ settings = {}, startSurah = 1, page: pageOverrides = {} } = {}) {
+function setup({ settings = {}, startSurah = 1, page: pageOverrides = {}, announcer = null } = {}) {
   const win = { postMessage() {}, addEventListener() {}, location: { origin: 'https://quran.com' } };
   const detector = new AudioDetector({ site, win });
   const store = new Map();
@@ -82,6 +82,7 @@ function setup({ settings = {}, startSurah = 1, page: pageOverrides = {} } = {})
     page,
     detector,
     store: { load: (k) => store.get(k) ?? null, save: (k, v) => store.set(k, v), remove: (k) => store.delete(k) },
+    announcer,
     notify: (n) => notices.push(n),
     onStatus: (s) => statuses.push(s),
     timing: TIMING,
@@ -371,4 +372,77 @@ test('restores the previous playback speed on the new surah', async () => {
   h.finish();
   await until(() => h.controller.state === 'playing' && h.audio.surah === 2);
   assert.deepEqual(h.calls.rate, [1.5]);
+});
+
+function fakeAnnouncer(behaviour = 'resolve') {
+  const a = { calls: [], cancels: 0, finish: null };
+  a.announce = (n) => {
+    a.calls.push(n);
+    if (behaviour === 'hang') return new Promise(() => {});
+    if (behaviour === 'reject') return Promise.reject(new Error('no voice'));
+    return new Promise((resolve) => (a.finish = resolve));
+  };
+  a.cancel = () => a.cancels++;
+  return a;
+}
+
+test('announces the next surah and starts it only after the announcement ends', async () => {
+  const announcer = fakeAnnouncer();
+  const h = setup({ announcer, settings: {} });
+  h.startPlaying();
+  h.finish();
+  await until(() => announcer.calls.length === 1 && h.calls.soft.length === 1);
+  assert.deepEqual(announcer.calls, [2]);
+  await wait(15);
+  assert.deepEqual(h.calls.clicks, [], 'Play pressed while still speaking');
+  announcer.finish({ ok: true });
+  await until(() => h.controller.state === 'playing' && h.audio.surah === 2);
+});
+
+test('a voice that never finishes or fails does not block playback', async () => {
+  for (const behaviour of ['hang', 'reject']) {
+    const announcer = fakeAnnouncer(behaviour);
+    const h = setup({ announcer });
+    h.startPlaying();
+    h.finish();
+    await until(() => h.controller.state === 'playing' && h.audio.surah === 2, 1000);
+    assert.deepEqual(announcer.calls, [2], behaviour);
+  }
+});
+
+test('announcement is off when disabled, and spoken once despite retries', async () => {
+  const off = fakeAnnouncer();
+  const h1 = setup({ announcer: off, settings: { announceNextSurah: false } });
+  h1.startPlaying();
+  h1.finish();
+  await until(() => h1.controller.state === 'playing' && h1.audio.surah === 2);
+  assert.deepEqual(off.calls, []);
+
+  const once = fakeAnnouncer('reject');
+  const h2 = setup({ announcer: once, settings: { retryCount: 2 } });
+  h2.page.ready = false;
+  h2.startPlaying();
+  h2.finish();
+  await until(() => h2.controller.state === 'error', 2000);
+  assert.deepEqual(once.calls, [2]);
+});
+
+test('cancelling a move stops the announcement', async () => {
+  const announcer = fakeAnnouncer('hang');
+  const h = setup({ announcer });
+  h.page.ready = false;
+  h.startPlaying();
+  h.finish();
+  await until(() => h.controller.transition !== null);
+  h.controller.stop();
+  assert.equal(announcer.cancels, 1);
+});
+
+test('Next Surah from the popup is announced too', async () => {
+  const announcer = fakeAnnouncer('reject');
+  const h = setup({ announcer, startSurah: 17 });
+  h.startPlaying();
+  h.controller.next();
+  await until(() => h.controller.state === 'playing' && h.audio.surah === 18);
+  assert.deepEqual(announcer.calls, [18]);
 });

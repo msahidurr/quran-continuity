@@ -25,6 +25,7 @@
     pollMs: 250,
     secondMs: 1000,
     pendingMaxAgeMs: 60000,
+    announceMaxMs: 8000, // never hold playback longer than this for the spoken announcement
   });
 
   class TransitionError extends Error {
@@ -42,10 +43,11 @@
   }
 
   class PlaybackController {
-    constructor({ page, detector, store, notify = () => {}, onStatus = () => {}, timing = {} }) {
+    constructor({ page, detector, store, announcer = null, notify = () => {}, onStatus = () => {}, timing = {} }) {
       this.page = page;
       this.detector = detector;
       this.store = store;
+      this.announcer = announcer;
       this.notify = notify;
       this.onStatus = onStatus;
       this.timing = { ...DEFAULT_TIMING, ...timing };
@@ -267,6 +269,11 @@
         arrived: this.urlSurah === target,
         attempt: attemptsUsed,
         timer: null,
+        // Spoken while the next page loads; not repeated for retries or after a full page load.
+        announcement:
+          this.announcer && this.settings.announceNextSurah && attemptsUsed === 0
+            ? Promise.resolve(this.announcer.announce(target)).catch(() => {})
+            : null,
       };
       this.transition = t;
       this.state = STATE.TRANSITIONING;
@@ -290,6 +297,7 @@
       this.emit();
       try {
         await this.ensureOnPage(t);
+        await this.finishAnnouncement(t);
         await this.startAndVerify(t);
         this.assertActive(t);
         this.transition = null;
@@ -312,6 +320,17 @@
           if (this.isActive(t)) this.runAttempt(t);
         }, delay * this.timing.secondMs);
       }
+    }
+
+    /** Waits for the announcement so it doesn't overlap the recitation; failures never block playback. */
+    async finishAnnouncement(t) {
+      if (!t.announcement) return;
+      const spoken = t.announcement;
+      t.announcement = null;
+      let timer;
+      await Promise.race([spoken, new Promise((r) => (timer = setTimeout(r, this.timing.announceMaxMs)))]);
+      clearTimeout(timer);
+      this.assertActive(t);
     }
 
     async ensureOnPage(t) {
@@ -411,6 +430,7 @@
       const t = this.transition;
       if (!t) return false;
       clearTimeout(t.timer);
+      if (t.announcement && this.announcer) this.announcer.cancel();
       this.transition = null;
       this.store.remove('pending');
       for (const w of [...this.waiters]) w.reject(new CancelledError());

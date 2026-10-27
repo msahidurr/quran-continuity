@@ -53,12 +53,31 @@
     }
   }
 
+  // Speech runs in the service worker (chrome.tts); the promise settles when speaking ends or fails.
+  const announcer = {
+    announce(surah) {
+      try {
+        return chrome.runtime.sendMessage({ type: MSG.SPEAK, surah, language: settings.announceLanguage }).catch(() => {});
+      } catch {
+        return Promise.resolve();
+      }
+    },
+    cancel() {
+      try {
+        chrome.runtime.sendMessage({ type: MSG.STOP_SPEAKING }).catch(() => {});
+      } catch {
+        /* orphaned content script */
+      }
+    },
+  };
+
   const detector = new QC.audio.AudioDetector({ site: QC.site, win: window });
   const quranNavigator = new QC.QuranNavigator({ site: QC.site, detector, win: window });
   const controller = new QC.playback.PlaybackController({
     page: quranNavigator,
     detector,
     store,
+    announcer,
     notify: (n) => {
       if (settings.showPageNotifications) showToast(n);
     },

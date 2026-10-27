@@ -6,8 +6,9 @@ same reciter and speed.
 
 - Follows whatever surah you start. There is no starting point to configure.
 - Pausing never counts as finishing, and anything you do on the page takes priority over automatic moves.
+- Announces the next surah by voice (English or Arabic) before it starts.
 - Optional ending surah, plus a configurable retry count and delay.
-- Needs only the `storage` permission and runs only on `https://quran.com/*`. No backend, no
+- Needs only the `storage` and `tts` (text-to-speech) permissions and runs only on `https://quran.com/*`. No backend, no
   analytics, no network requests of its own.
 
 ## Install (unpacked)
@@ -42,6 +43,8 @@ Quran.com page. You can turn this off in the settings.
 | Retry delay | 3 s | Wait between attempts (1–60 s). |
 | Keep playback speed | on | If the new surah starts at a different speed, restore the previous one. |
 | Notices on Quran.com | on | Show the on-page notice. |
+| Announce the next surah | on | Say "Next surah: Al-Baqarah, number 2." while the next page loads. The recitation starts after the announcement, never over it. |
+| Announcement language | English | English or Arabic ("السورة التالية: سورة البقرة"). Use **Test voice** to check that a voice exists. |
 
 These are always on and have no setting:
 - A manual pause never triggers a move.
@@ -69,11 +72,13 @@ page-bridge.js (MAIN world)          content scripts (isolated world)
    clips under `/wbw/` are ignored).
 2. The extension then waits one second. If Quran.com restarts the audio (repeat mode, or you pressed
    play), nothing happens.
-3. It applies the rules (ending surah, end of the Quran), then navigates using Quran.com's own Next.js
+3. It applies the rules (ending surah, end of the Quran), starts the spoken announcement
+   (Chrome's `chrome.tts`, via the background service worker), and navigates using Quran.com's own Next.js
    router. The tab never reloads, so Chrome still allows audio playback.
 4. When the new chapter page is ready, it presses the site's **Play Surah** button
    (`[data-testid="listen-button"]`). The transition only counts as done once the audio element reports
-   `playing` with that surah's file.
+   `playing` with that surah's file. It waits for the announcement first, for at most 8 seconds, so a
+   missing or broken voice never blocks playback. Retries don't repeat the announcement.
 5. If something fails, it retries within your limits and then shows an error. If client-side navigation
    isn't available, it falls back to a full page load and resumes the move from there.
 
@@ -84,7 +89,7 @@ Requires Node 20 or newer. There are no dependencies to install.
 ```bash
 npm test             # unit tests: rules, URL/audio parsing, duplicate detection, full controller scenarios
 npm run test:live    # live smoke test on quran.com in headless Chrome (needs network + google-chrome)
-npm run test:qa      # full QA: loads the real unpacked extension, 20 end-to-end scenarios incl. popup,
+npm run test:qa      # full QA: loads the real unpacked extension, 21 end-to-end scenarios incl. popup,
                      # options page, retries with the audio host blocked, and a browser restart (~5 min)
 npm run package      # zip for distribution / Chrome Web Store upload
 ```
@@ -114,7 +119,25 @@ locale list, URL and audio-file patterns. The player element id is in
 | "Chrome blocked autoplay" | Press Play once on the page. This happens after a full page load in a tab you haven't interacted with. Normal moves don't reload the page, so it rarely appears. |
 | "Couldn't find Quran.com's Play button" | Quran.com's markup changed. See *When Quran.com changes*. |
 | Retries then an error | Check your connection or whether the audio host is blocked (ad blockers, network filters). |
+| No announcement | Click **Test voice** in settings; the line under it names the voice in use. |
+| Arabic is announced in English | No Arabic voice is installed. See *No Arabic voice* below. |
 | Doesn't advance | Check that auto-play is on, the tab isn't stopped (popup shows **Resume Auto-Play**), and no ending surah applies. |
+
+### No Arabic voice
+
+Chrome's built-in online voices don't include Arabic, so Arabic announcements need a voice installed in
+the operating system. Until one exists, the extension speaks the English announcement instead of staying
+silent, and the settings page says so.
+
+- **Windows 10/11:** Settings → Time & language → Language & region → Add a language → Arabic, with
+  *Text-to-speech* ticked. This adds voices such as Microsoft Hoda or Naayf.
+- **macOS:** System Settings → Accessibility → Spoken Content → System voice → Manage Voices… → Arabic
+  (e.g. Majed).
+- **Linux:** Chrome uses system voices through speech-dispatcher. Install `speech-dispatcher` and
+  `espeak-ng`; the Arabic voice is understandable but robotic.
+
+Then **quit and restart Chrome** completely, open the extension settings, choose Arabic and click
+**Test voice**. The line under the button should name the Arabic voice.
 
 ## Known limitations
 
@@ -129,5 +152,6 @@ locale list, URL and audio-file patterns. The player element id is in
 
 ## Privacy
 
-There is no tracking or telemetry, and the extension sends nothing to any server. The only data stored
+There is no tracking or telemetry, and the extension sends nothing to any server. Announcements use Chrome's
+voices; Chrome's own online "Google" voices may send the announcement text (the surah name) to Google. The only data stored
 is your settings, in this browser.

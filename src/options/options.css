@@ -68,6 +68,8 @@ select, input[type="number"] {
 }
 [aria-invalid="true"] { border-color: var(--danger); }
 [aria-invalid="true"]:focus-visible { outline-color: var(--danger); }
+.inline { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+#voice-result { margin: 6px 0 0; }
 .error { margin: 6px 0 0; color: var(--danger); font-size: 13px; }
 
 .switch {

@@ -253,6 +253,33 @@ async function popupState(popup) {
   })`);
 }
 
+/** Records chrome.tts.speak calls (text, events, end time) inside the extension's service worker. */
+let swSession;
+async function spyOnTts() {
+  const { targetInfos } = await send('Target.getTargets');
+  const sw = targetInfos.find((t) => t.type === 'service_worker' && t.url.includes(extensionId));
+  if (!sw) throw new Error('extension service worker not running');
+  ({ sessionId: swSession } = await send('Target.attachToTarget', { targetId: sw.targetId, flatten: true }));
+  await send('Runtime.evaluate', {
+    expression: `if (!self.__ttsLog) {
+      self.__ttsLog = [];
+      const speak = chrome.tts.speak.bind(chrome.tts);
+      chrome.tts.speak = (text, opts = {}, cb) => {
+        const entry = { text, lang: opts.lang, at: Date.now(), events: [], endAt: null };
+        self.__ttsLog.push(entry);
+        const onEvent = opts.onEvent;
+        return speak(text, { ...opts, onEvent: (e) => { entry.events.push(e.type + (e.errorMessage ? ':' + e.errorMessage : ''));
+          if (['end', 'error', 'interrupted', 'cancelled'].includes(e.type)) entry.endAt = Date.now(); onEvent && onEvent(e); } }, cb);
+      };
+    }`,
+  }, swSession);
+}
+
+async function ttsLog() {
+  const r = await send('Runtime.evaluate', { expression: 'self.__ttsLog', returnByValue: true }, swSession);
+  return r.result.value || [];
+}
+
 // ---- test runner --------------------------------------------------------------------------------
 
 const results = [];
@@ -329,7 +356,9 @@ async function run() {
 
   let reciter;
   await scenario('AC-01/AC-08/AC-12/AC-14: 112 ends → 113 plays once, same reciter, URL follows', async () => {
+    await spyOnTts();
     const a = await startSurah(quran, '/112', 112);
+    await quran.eval(`document.getElementById('audio-player').addEventListener('playing', () => { window.__qaPlayingAt = Date.now(); })`);
     reciter = reciterOfSrc(a.src);
     await waitFor('status playing 112', async () => (await status(tabId)).state === 'playing', 5000);
     await seekNearEnd(quran);
@@ -344,6 +373,18 @@ async function run() {
     expect(st.state === 'playing' && st.currentSurah === 113, `status ${JSON.stringify(st)}`);
     expect(reciterOfSrc(b.src) === reciter, `reciter changed ${reciter} → ${reciterOfSrc(b.src)}`);
     return `${c.path}, reciter ${reciter}, duplicate ended events ignored`;
+  });
+
+  await scenario('Voice: next surah is announced, and the recitation starts after it', async () => {
+    const log = await ttsLog();
+    const voices = await control.eval(`new Promise((r) => chrome.tts.getVoices((v) => r(v.map((x) => x.voiceName + ' (' + (x.lang || '?') + ')'))))`);
+    const playingAt = await quran.eval('window.__qaPlayingAt || null');
+    expect(log.length === 1, `expected 1 announcement, got ${JSON.stringify(log)}`);
+    const [entry] = log;
+    expect(entry.text === 'Next surah: Al-Falaq, number 113.' && entry.lang === 'en-US', JSON.stringify(entry));
+    expect(entry.endAt !== null, `speech never finished: ${JSON.stringify(entry)}`);
+    expect(playingAt && playingAt >= entry.endAt, `recitation started ${entry.endAt - playingAt} ms before speech ended`);
+    return `"${entry.text}" events=[${entry.events}] spoke ${entry.endAt - entry.at} ms, recitation +${playingAt - entry.endAt} ms after; voices: ${voices.length ? voices.slice(0, 4).join(', ') : 'none installed'}`;
   });
 
   await scenario('AC-03/AC-04: manual pause never advances; resume continues', async () => {
@@ -578,8 +619,23 @@ async function run() {
     await opts.screenshot('options-saved.png');
     await opts.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
     await opts.screenshot('options-dark.png');
+    const englishInfo = await waitFor('voice info', () => opts.eval(`document.getElementById('voice-result').textContent`), 5000);
+    await opts.eval(`(() => { const s = document.getElementById('announceLanguage'); s.value = 'ar'; s.dispatchEvent(new Event('change')); })()`);
+    const voiceResult = await waitFor('Arabic voice info', async () => {
+      const t = await opts.eval(`document.getElementById('voice-result').textContent`);
+      return t && t !== englishInfo ? t : null;
+    }, 5000);
+    await opts.eval(`document.getElementById('test-voice').click()`);
+    await waitFor('test voice finished', () => opts.eval(`!document.getElementById('voice-result').textContent.startsWith('Speaking…')`), 15000);
+    await opts.eval(`(() => { document.getElementById('announceLanguage').value = 'en'; document.getElementById('form').requestSubmit(); })()`);
+    // The real announcement path (service worker) with Arabic selected: Arabic voice, or English fallback.
+    const arabic = await control.eval(`chrome.runtime.sendMessage({ type: 'qc:speak', surah: 2, language: 'ar' })`);
+    const hasArabicVoice = await control.eval(`new Promise((r) => chrome.tts.getVoices((v) => r(v.some((x) => (x.lang || '').startsWith('ar')))))`);
+    expect(arabic && arabic.event === 'end', `Arabic announcement failed: ${JSON.stringify(arabic)}`);
+    expect(hasArabicVoice ? !arabic.fallback && arabic.text.includes('البقرة') : arabic.fallback && arabic.text.startsWith('Next surah'), JSON.stringify(arabic));
+    expect(hasArabicVoice ? /Voice:/.test(voiceResult) : /No Arabic voice/.test(voiceResult), `settings page says: ${voiceResult}`);
     await opts.close();
-    return `rejected 99/0 with inline errors; saved ${JSON.stringify({ retryCount: 4, retryDelaySeconds: 7, endSurah: 18 })}`;
+    return `Arabic: ${hasArabicVoice ? 'Arabic voice ' + arabic.voiceName : 'no Arabic voice → spoken in English with ' + arabic.voiceName}; settings page: "${voiceResult}"; rejected 99/0 with inline errors; saved ${JSON.stringify({ retryCount: 4, retryDelaySeconds: 7, endSurah: 18 })}`;
   });
 
   await scenario('Keyboard: popup controls reachable with Tab and have labels', async () => {

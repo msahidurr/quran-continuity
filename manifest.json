@@ -4,7 +4,10 @@
   "version": "1.0.0",
   "description": "Automatically play the next surah on Quran.com when the current one finishes.",
   "minimum_chrome_version": "111",
-  "permissions": ["storage"],
+  "permissions": ["storage", "tts"],
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
   "action": {
     "default_title": "Quran Continuity",
     "default_popup": "src/popup/popup.html",

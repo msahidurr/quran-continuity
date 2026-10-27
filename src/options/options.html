@@ -40,6 +40,27 @@
 
         <div class="field toggle">
           <div>
+            <label for="announceNextSurah">Announce the next surah</label>
+            <p class="hint">Say which surah comes next before it starts, using Chrome's built-in voice.</p>
+          </div>
+          <input type="checkbox" id="announceNextSurah" name="announceNextSurah" role="switch" class="switch">
+        </div>
+
+        <div class="field">
+          <label for="announceLanguage">Announcement language</label>
+          <p class="hint" id="announceLanguage-hint">English: "Next surah: Al-Baqarah, number 2." Arabic: "السورة التالية: سورة البقرة". Arabic needs an Arabic voice installed on this computer; without one, the announcement is spoken in English.</p>
+          <div class="inline">
+            <select id="announceLanguage" name="announceLanguage" aria-describedby="announceLanguage-hint">
+              <option value="en">English</option>
+              <option value="ar">Arabic (العربية)</option>
+            </select>
+            <button type="button" id="test-voice">Test voice</button>
+          </div>
+          <p class="hint" id="voice-result" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="field toggle">
+          <div>
             <label for="showPageNotifications">Notices on Quran.com</label>
             <p class="hint">Show a short message on the page when auto-play stops or fails.</p>
           </div>
@@ -87,6 +108,7 @@
   <script src="../shared/surahs.js"></script>
   <script src="../shared/defaults.js"></script>
   <script src="../shared/validation.js"></script>
+  <script src="../shared/announcement.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

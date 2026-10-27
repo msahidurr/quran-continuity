@@ -11,6 +11,8 @@
     STOP_AUTOPLAY: 'qc:stop-autoplay',
     RESUME_AUTOPLAY: 'qc:resume-autoplay',
     STATUS_CHANGED: 'qc:status-changed',
+    SPEAK: 'qc:speak',
+    STOP_SPEAKING: 'qc:stop-speaking',
   });
 
   const STATE = Object.freeze({
