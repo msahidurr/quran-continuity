@@ -1,0 +1,15 @@
+{
+  "name": "quran-continuity",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chrome extension that plays the next surah on Quran.com when the current one finishes.",
+  "scripts": {
+    "test": "node --test \"tests/unit/*.test.js\"",
+    "test:live": "node tests/integration/live-quran-smoke.mjs",
+    "test:qa": "node tests/integration/qa-extension.mjs",
+    "package": "zip -r quran-continuity-1.0.0.zip manifest.json src icons -x '*.DS_Store'"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

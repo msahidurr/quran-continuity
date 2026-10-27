@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quran Continuity Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <h1>Quran Continuity</h1>
+    <p class="lead">Rules for what happens when a surah finishes on Quran.com. Settings are stored only in this browser.</p>
+
+    <form id="form" novalidate>
+      <section>
+        <h2>Playback rules</h2>
+
+        <div class="field toggle">
+          <div>
+            <label for="autoPlayEnabled">Continue playback</label>
+            <p class="hint">When a surah finishes, open the next surah and start it.</p>
+          </div>
+          <input type="checkbox" id="autoPlayEnabled" name="autoPlayEnabled" role="switch" class="switch">
+        </div>
+
+        <div class="field">
+          <label for="endSurah">Ending surah</label>
+          <p class="hint" id="endSurah-hint">Playback stops after this surah finishes. If you start after it, auto-play also stops at the end of the surah you're on.</p>
+          <select id="endSurah" name="endSurah" aria-describedby="endSurah-hint endSurah-error"></select>
+          <p class="error" id="endSurah-error" hidden></p>
+        </div>
+
+        <div class="field toggle">
+          <div>
+            <label for="preservePlaybackSpeed">Keep playback speed</label>
+            <p class="hint">If the next surah starts at a different speed, set it back to the speed you were listening at.</p>
+          </div>
+          <input type="checkbox" id="preservePlaybackSpeed" name="preservePlaybackSpeed" role="switch" class="switch">
+        </div>
+
+        <div class="field toggle">
+          <div>
+            <label for="showPageNotifications">Notices on Quran.com</label>
+            <p class="hint">Show a short message on the page when auto-play stops or fails.</p>
+          </div>
+          <input type="checkbox" id="showPageNotifications" name="showPageNotifications" role="switch" class="switch">
+        </div>
+      </section>
+
+      <section>
+        <h2>When something fails</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="retryCount">Retries</label>
+            <p class="hint" id="retryCount-hint">Extra attempts if the next surah fails to load or play (0–10).</p>
+            <input type="number" id="retryCount" name="retryCount" min="0" max="10" step="1" inputmode="numeric" aria-describedby="retryCount-hint retryCount-error">
+            <p class="error" id="retryCount-error" hidden></p>
+          </div>
+          <div class="field">
+            <label for="retryDelaySeconds">Delay between attempts (seconds)</label>
+            <p class="hint" id="retryDelaySeconds-hint">1–60 seconds.</p>
+            <input type="number" id="retryDelaySeconds" name="retryDelaySeconds" min="1" max="60" step="1" inputmode="numeric" aria-describedby="retryDelaySeconds-hint retryDelaySeconds-error">
+            <p class="error" id="retryDelaySeconds-error" hidden></p>
+          </div>
+        </div>
+        <p class="hint">After the last attempt fails, auto-play stops and shows the error. It never retries endlessly.</p>
+      </section>
+
+      <section>
+        <h2>Always on</h2>
+        <ul class="fixed">
+          <li><strong>Manual pause</strong> is never treated as a finished surah, and auto-play never resumes paused audio.</li>
+          <li><strong>Manual navigation</strong>: when you play a different surah, auto-play follows it. Opening another page cancels a pending move.</li>
+          <li><strong>Reciter</strong>: the extension never changes it. Quran.com's selected reciter is used.</li>
+          <li><strong>Blocked playback</strong>: if Chrome blocks autoplay, you see an error and the extension waits for you to press Play.</li>
+        </ul>
+      </section>
+
+      <div class="bar">
+        <button type="submit" class="primary">Save</button>
+        <button type="button" id="reset">Restore defaults</button>
+        <span id="saved" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+  </main>
+
+  <script src="../shared/surahs.js"></script>
+  <script src="../shared/defaults.js"></script>
+  <script src="../shared/validation.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

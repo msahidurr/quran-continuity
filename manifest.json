@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Quran Continuity",
+  "version": "1.0.0",
+  "description": "Automatically play the next surah on Quran.com when the current one finishes.",
+  "minimum_chrome_version": "111",
+  "permissions": ["storage"],
+  "action": {
+    "default_title": "Quran Continuity",
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "options_page": "src/options/options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://quran.com/*"],
+      "js": ["src/page/page-bridge.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://quran.com/*"],
+      "js": [
+        "src/shared/surahs.js",
+        "src/shared/defaults.js",
+        "src/shared/messages.js",
+        "src/shared/validation.js",
+        "src/content/quran-site.js",
+        "src/content/audio-detector.js",
+        "src/content/navigation.js",
+        "src/content/playback-controller.js",
+        "src/content/quran-content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

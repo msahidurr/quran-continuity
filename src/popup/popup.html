@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Quran Continuity</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>Quran Continuity</h1>
+  </header>
+
+  <main>
+    <section class="status" id="status" aria-live="polite">
+      <p class="status-line"><span class="dot" id="status-dot" aria-hidden="true"></span><span id="status-text">Checking this tab…</span></p>
+      <p class="status-detail" id="status-detail" hidden></p>
+    </section>
+
+    <div class="row">
+      <label for="autoplay">Auto-play next surah</label>
+      <input type="checkbox" id="autoplay" role="switch" class="switch">
+    </div>
+
+    <div class="row">
+      <label for="end-surah">Stop after</label>
+      <select id="end-surah"></select>
+    </div>
+
+    <div class="actions">
+      <button type="button" id="next" class="primary">Next Surah</button>
+      <button type="button" id="stop">Stop Auto-Play</button>
+    </div>
+
+    <p class="message" id="message" role="alert" hidden></p>
+  </main>
+
+  <footer>
+    <button type="button" id="open-options" class="link">Advanced settings</button>
+  </footer>
+
+  <script src="../shared/surahs.js"></script>
+  <script src="../shared/defaults.js"></script>
+  <script src="../shared/messages.js"></script>
+  <script src="../shared/validation.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
